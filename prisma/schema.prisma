@@ -11,7 +11,11 @@ model User {
   id            String   @id @default(cuid())
   name          String
   email         String   @unique
-  passwordHash  String
+  passwordHash  String?
+  googleId      String?  @unique
+  appleId       String?  @unique
+  avatarUrl     String?
+  onboarded     Boolean  @default(false)
   monthlyIncome Float    @default(0)
   goal          String   @default("organize")
   hasDebts      Boolean  @default(false)
