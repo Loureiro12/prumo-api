@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AuthenticatedRequest } from '../../middlewares/auth';
 import * as service from './accounts.service';
 
-const uid = (req: unknown): string => uid(req);
+const uid = (req: unknown): string => (req as AuthenticatedRequest).userId;
 
 export const accountsRoutes = Router();
 
