@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import {
   addMonthsToRef, invoiceDates, invoiceMonthForPurchase, splitInstallments,
@@ -29,11 +30,13 @@ export function list(userId: string, filters: ListFilters) {
   });
 }
 
-async function ensureInvoice(creditCardId: string, referenceMonth: string) {
-  const card = await prisma.creditCard.findUnique({ where: { id: creditCardId } });
+async function ensureInvoice(
+  tx: Prisma.TransactionClient, creditCardId: string, referenceMonth: string,
+) {
+  const card = await tx.creditCard.findUnique({ where: { id: creditCardId } });
   if (!card) throw notFound('Cartão não encontrado');
   const dates = invoiceDates(referenceMonth, card.closingDay, card.dueDay);
-  return prisma.creditCardInvoice.upsert({
+  return tx.creditCardInvoice.upsert({
     where: { creditCardId_referenceMonth: { creditCardId, referenceMonth } },
     create: { creditCardId, referenceMonth, ...dates },
     update: {},
@@ -72,12 +75,12 @@ export async function createExpense(userId: string, input: ExpenseInput) {
   const firstMonth = invoiceMonthForPurchase(new Date(input.date), card.closingDay);
   const groupId = count > 1 ? crypto.randomUUID() : null;
 
-  return prisma.$transaction(async () => {
+  return prisma.$transaction(async (tx) => {
     const created = [];
     for (let i = 0; i < count; i += 1) {
       const ref = addMonthsToRef(firstMonth, i);
-      const invoice = await ensureInvoice(card.id, ref);
-      created.push(await prisma.transaction.create({
+      const invoice = await ensureInvoice(tx, card.id, ref);
+      created.push(await tx.transaction.create({
         data: {
           userId, type: 'expense', amount: amounts[i],
           description: input.description, categoryId: input.categoryId,
@@ -92,7 +95,7 @@ export async function createExpense(userId: string, input: ExpenseInput) {
       }));
     }
     return created;
-  });
+  }, { timeout: 20_000 }); // até 48 parcelas (cada uma com 2 round-trips) pode passar dos 5s padrão
 }
 
 interface IncomeInput {
