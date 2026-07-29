@@ -137,6 +137,19 @@ export async function markAsPaid(userId: string, id: string) {
   return prisma.transaction.update({ where: { id }, data: { status: 'paid' } });
 }
 
+export async function duplicate(userId: string, id: string) {
+  const tx = await prisma.transaction.findFirst({ where: { id, userId } });
+  if (!tx) throw notFound('Lançamento não encontrado');
+  const {
+    id: _id, createdAt: _createdAt,
+    installmentGroupId: _installmentGroupId,
+    installmentNumber: _installmentNumber,
+    installmentTotal: _installmentTotal,
+    ...rest
+  } = tx;
+  return prisma.transaction.create({ data: rest });
+}
+
 /** Regra 9: excluir uma parcela remove o grupo inteiro para manter faturas íntegras. */
 export async function remove(userId: string, id: string) {
   const tx = await prisma.transaction.findFirst({ where: { id, userId } });

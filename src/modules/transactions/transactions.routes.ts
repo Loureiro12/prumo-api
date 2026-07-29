@@ -75,6 +75,12 @@ transactionsRoutes.patch('/:id/pay', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+transactionsRoutes.post('/:id/duplicate', async (req, res, next) => {
+  try {
+    res.status(201).json(await service.duplicate(uid(req), req.params.id));
+  } catch (e) { next(e); }
+});
+
 transactionsRoutes.delete('/:id', async (req, res, next) => {
   try {
     await service.remove(uid(req), req.params.id);
