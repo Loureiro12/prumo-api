@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
+import { dueRecurringForMonth } from '../../domain/finance';
 import type { AuthenticatedRequest } from '../../middlewares/auth';
 
 export const recurringRoutes = Router();
@@ -36,6 +37,23 @@ recurringRoutes.post('/', async (req, res, next) => {
         endDate: data.endDate ? new Date(data.endDate) : null,
       },
     }));
+  } catch (e) { next(e); }
+});
+
+/** Regra 7: gera os lançamentos pendentes do mês corrente para as contas fixas ativas. */
+recurringRoutes.post('/generate', async (req, res, next) => {
+  try {
+    const userId = uid(req);
+    const month = new Date().toISOString().slice(0, 7);
+    const [recurring, existing] = await Promise.all([
+      prisma.recurringTransaction.findMany({ where: { userId } }),
+      prisma.transaction.findMany({ where: { userId, recurringId: { not: null } } }),
+    ]);
+    const due = dueRecurringForMonth(recurring, existing, month);
+    const created = await prisma.$transaction(
+      due.map((d) => prisma.transaction.create({ data: { ...d, userId } })),
+    );
+    res.status(201).json(created);
   } catch (e) { next(e); }
 });
 
